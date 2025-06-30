@@ -21,7 +21,7 @@ func NewProductRepository(log *logrus.Logger, db *gorm.DB) *ProductRepository {
 }
 
 func (p *ProductRepository) Save(db *gorm.DB, product *entity.Product) (*entity.Product, error) {
-	err := p.DB.Create(product).Error
+	err := db.Create(product).Error
 	if err != nil {
 		p.Log.Errorf("❌ Failed to save product: %v", err)
 		return nil, err
@@ -29,12 +29,28 @@ func (p *ProductRepository) Save(db *gorm.DB, product *entity.Product) (*entity.
 	return product, nil
 }
 
-func (p *ProductRepository) GetAll(db *gorm.DB, ctx context.Context) ([]*entity.Product, error) {
+func (p *ProductRepository) GetAll(db *gorm.DB, ctx context.Context, limit, offset int) ([]*entity.Product, int64, error) {
 	var products []*entity.Product
-	err := p.DB.WithContext(ctx).Find(&products).Error
+	var total int64
+
+	if err := db.WithContext(ctx).Model(&entity.Product{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := db.WithContext(ctx).Limit(limit).Offset(offset).Find(&products).Error
 	if err != nil {
 		p.Log.Error("❌ Failed to get all products", err)
+		return nil, 0, err
+	}
+
+	return products, total, nil
+}
+
+func (p *ProductRepository) GetByID(db *gorm.DB, id int64) (*entity.Product, error) {
+	var product entity.Product
+	err := db.Where("id = ?", id).First(&product).Error
+	if err != nil {
 		return nil, err
 	}
-	return products, nil
+	return &product, nil
 }

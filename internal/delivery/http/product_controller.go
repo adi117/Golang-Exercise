@@ -1,6 +1,10 @@
 package http
 
 import (
+	"math"
+	"strconv"
+
+	"github.com/adi117/Golang-Exercise/internal/entity"
 	"github.com/adi117/Golang-Exercise/internal/model"
 	"github.com/adi117/Golang-Exercise/internal/usecase"
 	"github.com/gofiber/fiber/v2"
@@ -47,7 +51,21 @@ func (p *ProductController) CreateProduct(ctx *fiber.Ctx) error {
 }
 
 func (p *ProductController) GetAllProducts(ctx *fiber.Ctx) error {
-	products, err := p.Usecase.GetAllProducts(ctx.Context())
+
+	page, _ := strconv.Atoi(ctx.Query("page", "1"))
+	limit, _ := strconv.Atoi(ctx.Query("limit", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+
+	if limit < 1 {
+		limit = 1
+	}
+
+	offset := (page - 1) * limit
+
+	products, total, err := p.Usecase.GetAllProducts(ctx.Context(), limit, offset)
 	if err != nil {
 		p.Log.Error("failed to fetch products")
 		return ctx.Status(fiber.StatusInternalServerError).JSON(model.WebResponse[any]{
@@ -56,8 +74,46 @@ func (p *ProductController) GetAllProducts(ctx *fiber.Ctx) error {
 		})
 	}
 
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+
+	paginated := model.PaginatedResponse[*entity.Product]{
+		Items:       products,
+		Page:        page,
+		Limit:       limit,
+		Total:       total,
+		TotalPages:  totalPages,
+		HasNext:     page < totalPages,
+		HasPrevious: page > 1,
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[model.PaginatedResponse[*entity.Product]]{
+		Data:    paginated,
+		Success: true,
+		Message: "products fetched successfully",
+	})
+}
+
+func (p *ProductController) GetProductByID(ctx *fiber.Ctx) error {
+	id, err := ctx.ParamsInt("id")
+	if err != nil {
+		if err.Error() == "Product not found" {
+			return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+				Message: "Product not found",
+				Success: false,
+			})
+		}
+
+		p.Log.WithError(err).Error("failed to get product")
+		return ctx.Status(fiber.StatusInternalServerError).JSON(model.WebResponse[any]{
+			Message: "failed to retrieve product details",
+			Success: false,
+		})
+	}
+
+	product, err := p.Usecase.GetProductByID(ctx.Context(), int64(id))
+
 	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[any]{
-		Data:    products,
+		Data:    product,
 		Success: true,
 		Message: "products fetched successfully",
 	})
