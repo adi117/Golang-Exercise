@@ -17,6 +17,7 @@ type ProductUsecase interface {
 	CreateProduct(ctx context.Context, req *model.CreateProductRequest) (*model.CreateProductResponse, error)
 	GetAllProducts(ctx context.Context, limit, offset int) ([]*entity.Product, int64, error)
 	GetProductByID(ctx context.Context, id int64) (*model.CreateProductResponse, error)
+	UpdateProduct(ctx context.Context, id int64, req *model.UpdateProductRequest) (*model.CreateProductResponse, error)
 }
 
 type productUsecase struct {
@@ -68,5 +69,67 @@ func (p *productUsecase) GetProductByID(ctx context.Context, id int64) (*model.C
 		return nil, err
 	}
 	response := converter.ToCreateProductResponse(*product)
+	return &response, nil
+}
+
+func (p *productUsecase) UpdateProduct(ctx context.Context, id int64, req *model.UpdateProductRequest) (*model.CreateProductResponse, error) {
+
+	tx := p.DB.Begin()
+
+	currentProduct, err := p.ProductRepository.GetByID(tx, id)
+	if err != nil {
+		tx.Rollback()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("Product not found")
+		}
+
+		p.Log.WithError(err).Error("Failed to get product")
+		return nil, err
+	}
+
+	if req.Name != nil {
+		currentProduct.Name = *req.Name
+	}
+
+	if req.Category != nil {
+		currentProduct.Category = *req.Category
+	}
+
+	if req.Description != nil {
+		currentProduct.Description = *req.Description
+	}
+
+	if req.Discount != nil {
+		currentProduct.Discount = req.Discount
+	}
+
+	if req.Price != nil {
+		currentProduct.Price = *req.Discount
+	}
+
+	if req.Price != nil {
+		currentProduct.Price = *req.Price
+	}
+
+	if req.Stock != nil {
+		currentProduct.Stock = *req.Stock
+	}
+
+	// save updated product to DB
+	updatedProduct, err := p.ProductRepository.Update(tx, currentProduct)
+
+	if err != nil {
+		tx.Rollback()
+		p.Log.WithError(err).Error("failed to update product")
+		return nil, err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		p.Log.WithError(err).Error("failed to commit transaction")
+		return nil, err
+	}
+
+	response := converter.ToCreateProductResponse(*updatedProduct)
 	return &response, nil
 }

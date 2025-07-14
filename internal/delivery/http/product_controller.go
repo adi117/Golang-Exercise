@@ -95,6 +95,17 @@ func (p *ProductController) GetAllProducts(ctx *fiber.Ctx) error {
 
 func (p *ProductController) GetProductByID(ctx *fiber.Ctx) error {
 	id, err := ctx.ParamsInt("id")
+
+	if err != nil {
+		p.Log.WithError(err).Error("failed to parse id")
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Message: "invalid product id format",
+			Success: false,
+		})
+	}
+
+	product, err := p.Usecase.GetProductByID(ctx.Context(), int64(id))
+
 	if err != nil {
 		if err.Error() == "Product not found" {
 			return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
@@ -110,11 +121,54 @@ func (p *ProductController) GetProductByID(ctx *fiber.Ctx) error {
 		})
 	}
 
-	product, err := p.Usecase.GetProductByID(ctx.Context(), int64(id))
-
 	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[any]{
 		Data:    product,
 		Success: true,
 		Message: "products fetched successfully",
+	})
+}
+
+func (p *ProductController) UpdateProduct(ctx *fiber.Ctx) error {
+	id, err := ctx.ParamsInt("id")
+
+	if err != nil {
+		p.Log.WithError(err).Error("failed to parse id")
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Message: "invalid product id format",
+			Success: false,
+		})
+	}
+
+	request := new(model.UpdateProductRequest)
+
+	if err := ctx.BodyParser(request); err != nil {
+		p.Log.WithError(err).Error("failed to parse request body")
+		return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+			Message: "invalid request body format",
+			Success: false,
+		})
+	}
+
+	product, err := p.Usecase.UpdateProduct(ctx.Context(), int64(id), request)
+
+	if err != nil {
+		if err.Error() == "Product not found" {
+			return ctx.Status(fiber.StatusBadRequest).JSON(model.WebResponse[any]{
+				Message: "Product not found",
+				Success: false,
+			})
+		}
+
+		p.Log.WithError(err).Error("failed to get product")
+		return ctx.Status(fiber.StatusInternalServerError).JSON(model.WebResponse[any]{
+			Message: "failed to retrieve product details",
+			Success: false,
+		})
+	}
+
+	return ctx.Status(fiber.StatusOK).JSON(model.WebResponse[any]{
+		Data:    product,
+		Success: true,
+		Message: "product updated successfully",
 	})
 }

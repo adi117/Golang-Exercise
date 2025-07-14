@@ -27,4 +27,5 @@ func (r *Router) registerPublicEndpoints() {
 	r.App.Post("/products", r.ProductController.CreateProduct)
 	r.App.Get("/products", r.ProductController.GetAllProducts)
 	r.App.Get("/products/:id", r.ProductController.GetProductByID)
+	r.App.Post("/products/:id", r.ProductController.UpdateProduct)
 }

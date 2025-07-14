@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/adi117/Golang-Exercise/internal/entity"
 	"github.com/sirupsen/logrus"
@@ -29,6 +30,7 @@ func (p *ProductRepository) Save(db *gorm.DB, product *entity.Product) (*entity.
 	return product, nil
 }
 
+// select all products
 func (p *ProductRepository) GetAll(db *gorm.DB, ctx context.Context, limit, offset int) ([]*entity.Product, int64, error) {
 	var products []*entity.Product
 	var total int64
@@ -46,6 +48,7 @@ func (p *ProductRepository) GetAll(db *gorm.DB, ctx context.Context, limit, offs
 	return products, total, nil
 }
 
+// select product by ID
 func (p *ProductRepository) GetByID(db *gorm.DB, id int64) (*entity.Product, error) {
 	var product entity.Product
 	err := db.Where("id = ?", id).First(&product).Error
@@ -53,4 +56,21 @@ func (p *ProductRepository) GetByID(db *gorm.DB, id int64) (*entity.Product, err
 		return nil, err
 	}
 	return &product, nil
+}
+
+// update product by ID
+func (p *ProductRepository) Update(db *gorm.DB, product *entity.Product) (*entity.Product, error) {
+	err := db.Where("id = ?", product.ID).Updates(product).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			p.Log.WithField("id", product.ID).Error("product not found")
+			return nil, err
+		}
+		p.Log.Error(err)
+		return nil, err
+	}
+
+	// get the updated product
+	return p.GetByID(db, product.ID)
 }
